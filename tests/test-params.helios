@@ -1,0 +1,247 @@
+const payment_credential: Credential = Credential::new_pubkey(
+	PubKeyHash::new(#01234567890123456789012345678901234567890123456789012346)
+)
+
+func create_datum(results: Option[ByteArray], deadline: Time) -> Datum {
+	Datum {
+		proposal_id: "test",
+		minting_policy_identifier: MintingPolicyHash::new(
+			#406af97ef8cac5d6626859109e024e93775b2ac2dab39f83953c10e6
+		),
+		creator: PubKeyHash::new(
+			#6c29e3e756a5f7794792340b94b1426bab9ad61d87061a8c369f2009
+		),
+		deadline: deadline,
+		oracles: []PubKey{
+			PubKey::new(#57d74e4c8d25988a0fa6693dcd3f97153813bc487c84473e5e785b054b17712c),
+			PubKey::new(#14889cdb4b72ad10d4d4243c4f50141eea1d10a3482cd20a7da6245d05ea01f1),
+			PubKey::new(#f36f9a66f3916127e1ef303eef6cdde224c83da1fc46c3d948d2a68af62dced8)
+		},
+		min_signatures: 2,
+		payment_address: payment_credential,
+		results: results
+	}
+}
+
+const creator_pubkeyhash: PubKeyHash = PubKeyHash::new(
+	#6c29e3e756a5f7794792340b94b1426bab9ad61d87061a8c369f2009
+)
+
+const base_case_datum: Datum = create_datum(
+	Option[ByteArray]::None, Time::new(1000)
+)
+const deadline_not_passed_datum: Datum = create_datum(
+	Option[ByteArray]::None, Time::new(1001)
+)
+
+const base_case_redeemer: Redeemer = Redeemer {
+	results: #74657374,
+	signatures: []ByteArray{
+		#10477086e3f3c599abeed37465804213f655a7d213d49cba4525f611b26e792548cc8165a93852ba23716f3e88f13dab954d187514926cc36c469a76d619d703,
+		#01b54753c635dbbb59614b52679d413cd0e32332c9f50af83eaf8db23607e6dd74f4a8dc9ccae3842e248c380b5d5398f9f033edf0288100bc7f79c61861900b,
+		#420d990cdc067c8a5b99e80f4f4490c7e3418bce96131d07a03cb894f2609aa6330c4e625a1aba54ed093a2d071c71a55e2660db99ca00a018312e3d57d38209
+	}
+}
+
+const money_back_case_redeemer: Redeemer = Redeemer {
+	results: #74657374,
+	signatures: []ByteArray{}
+}
+
+const not_enough_sigs_redeemer: Redeemer = Redeemer { // Only one valid signature
+	results: #74657374,
+	signatures: []ByteArray{
+		#10477086e3f3c599abeed37465804213f655a7d213d49cba4525f611b26e792548cc8165a93852ba23716f3e88f13dab954d187514926cc36c469a76d619d703,
+		#d370dfeb38da6e253c670d5eefd7d0be8d037be750d3d15ca98c55c10ebafaf4dc9b910b4304042eded13bfad4846c6ce40b0c7b229fc99d251431bd5d0a850b,
+		#420d990cdc067c8a5b99e80f4f4490c7e3418bce96131d07a03cb894f2609aa6330c4e625a1aba54ed093a2d071c71a55e2660db99ca00a018312e3d57d38209
+	}
+}
+
+
+// Byte String with 56 / 64 chars
+const sample_bytestring_56 = #01234567890123456789012345678901234567890123456789012346
+const sample_bytestring_64 = #0123456789012345678901234567890123456789012345678901234567891234
+
+const sample_pubkeyhash: PubKeyHash = PubKeyHash::new(sample_bytestring_56)
+const sample_validatorhash: ValidatorHash = ValidatorHash::new(sample_bytestring_56)
+
+const sample_address: Address = Address::new(
+	Credential::new_pubkey(sample_pubkeyhash),
+	Option[StakingCredential]::None
+)
+
+const sample_ref_id: TxOutputId = TxOutputId::new(TxId::new(sample_bytestring_64), 0)
+
+const script_address: Address = Address::new(
+	Credential::new_validator(ValidatorHash::new(sample_bytestring_56)),
+	Option[StakingCredential]::None
+)
+
+func create_script_context(
+	redeemer: Redeemer,
+	datum: Datum,
+	outputs: []TxOutput,
+	signatures: []PubKeyHash
+) -> ScriptContext {
+	validator_addr: Address = Address::new(
+		Credential::new_validator(sample_validatorhash),
+		Option[StakingCredential]::None
+	);
+
+	ScriptContext::new_spending(
+		Tx::new(
+			[]TxInput{TxInput::new(
+				sample_ref_id,
+				TxOutput::new(
+					validator_addr,
+					Value::lovelace(10000000),
+					OutputDatum::new_inline(datum)
+				)
+			)},
+			[]TxInput{},
+			outputs,
+			Value::lovelace(160000),
+			Value::ZERO,
+			[]DCert{},
+			Map[StakingCredential]Int{},
+			TimeRange::from(Time::new(1000)),
+			signatures,
+			Map[ScriptPurpose]Redeemer{
+				ScriptPurpose::new_spending(sample_ref_id): redeemer
+			},
+			Map[DatumHash]Data{}
+		),
+		sample_ref_id
+	)
+}
+
+const payment_output: TxOutput = TxOutput::new(
+	Address::new(
+		payment_credential,
+		Option[StakingCredential]::None
+	),
+	Value::lovelace(8000000),
+	OutputDatum::new_none()
+)
+
+const success_outputs = []TxOutput{
+	payment_output,
+	TxOutput::new(
+		script_address,
+		Value::lovelace(1840000),
+		OutputDatum::new_inline(create_datum(Option[ByteArray]::Some{#74657374}, Time::new(1000)))
+	)
+}
+
+const no_script_outputs = []TxOutput{
+	payment_output,
+	TxOutput::new(
+		sample_address,
+		Value::lovelace(9840000),
+		OutputDatum::new_none()
+	)
+}
+
+const no_datum_outputs = []TxOutput{
+	payment_output,
+	TxOutput::new(
+		script_address,
+		Value::lovelace(1840000),
+		OutputDatum::new_none()
+	)
+}
+
+const insufficient_payment_outputs = []TxOutput{
+	TxOutput::new(
+		Address::new(
+			payment_credential,
+			Option[StakingCredential]::None
+		),
+		Value::lovelace(7999999),
+		OutputDatum::new_none()
+	),
+	TxOutput::new(
+		script_address,
+		Value::lovelace(1840001),
+		OutputDatum::new_none()
+	)
+}
+
+const test1_datum: Datum = base_case_datum
+const test1_redeemer: Redeemer = base_case_redeemer
+const test1_ctx: ScriptContext = create_script_context(
+	base_case_redeemer,
+	base_case_datum,
+	success_outputs,
+	[]PubKeyHash{}
+)
+
+// Repeated sigantures should not be considered valid twice
+const test2_datum: Datum = base_case_datum
+const test2_redeemer: Redeemer = not_enough_sigs_redeemer
+const test2_ctx: ScriptContext = create_script_context(
+	not_enough_sigs_redeemer,
+	base_case_datum,
+	success_outputs,
+	[]PubKeyHash{}
+)
+
+// If output datum is corrupted should fail
+const test3_datum: Datum = base_case_datum
+const test3_redeemer: Redeemer = base_case_redeemer
+const test3_ctx: ScriptContext = create_script_context(
+	base_case_redeemer,
+	base_case_datum,
+	no_datum_outputs,
+	[]PubKeyHash{}
+)
+
+// If we don't pay payment address should fail 
+const test4_datum: Datum = base_case_datum
+const test4_redeemer: Redeemer = base_case_redeemer
+const test4_ctx: ScriptContext = create_script_context(
+	base_case_redeemer,
+	base_case_datum,
+	insufficient_payment_outputs,
+	[]PubKeyHash{}
+)
+
+// Should be able to get money back if deadline passed
+const test5_datum: Datum = base_case_datum
+const test5_redeemer: Redeemer = money_back_case_redeemer
+const test5_ctx: ScriptContext = create_script_context(
+	money_back_case_redeemer,
+	base_case_datum,
+	no_script_outputs,
+	[]PubKeyHash{creator_pubkeyhash}
+)
+
+// Should not be able to get money back if deadline has not passed
+const test6_datum: Datum = deadline_not_passed_datum
+const test6_redeemer: Redeemer = money_back_case_redeemer
+const test6_ctx: ScriptContext = create_script_context(
+	money_back_case_redeemer,
+	deadline_not_passed_datum,
+	no_script_outputs,
+	[]PubKeyHash{creator_pubkeyhash}
+)
+
+// Should not be able to get money back if tx was not signed by creator
+const test7_datum: Datum = base_case_datum
+const test7_redeemer: Redeemer = money_back_case_redeemer
+const test7_ctx: ScriptContext = create_script_context(
+	money_back_case_redeemer,
+	base_case_datum,
+	no_script_outputs,
+	[]PubKeyHash{}
+)
+
+// // Should not be able to get money back if there is still a script output
+const test8_datum: Datum = base_case_datum
+const test8_redeemer: Redeemer = money_back_case_redeemer
+const test8_ctx: ScriptContext = create_script_context(
+	money_back_case_redeemer,
+	base_case_datum,
+	success_outputs,
+	[]PubKeyHash{creator_pubkeyhash}
+)

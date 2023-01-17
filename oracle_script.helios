@@ -1,0 +1,178 @@
+spending escrow
+
+struct Redeemer {
+    results: ByteArray
+    signatures: []ByteArray
+}
+
+struct Datum {
+    proposal_id: String
+    minting_policy_identifier: MintingPolicyHash
+    creator: PubKeyHash
+    deadline: Time
+    oracles: []PubKey
+    min_signatures: Int
+    payment_address: Credential
+    results: Option[ByteArray]
+
+    func add_results(self, results: ByteArray) -> Datum {
+        Datum {
+            proposal_id: self.proposal_id,
+            minting_policy_identifier: self.minting_policy_identifier,
+            creator: self.creator,
+            deadline: self.deadline,
+            oracles: self.oracles,
+            min_signatures: self.min_signatures,
+            payment_address: self.payment_address,
+            results: Option[ByteArray]::Some{results}
+        }
+    }
+}
+
+func verify_pubkey_signatures(
+    message: ByteArray,
+    pubkeys: []PubKey,
+    signatures: []ByteArray
+) -> Int {
+    // How many valid signatures do we have?
+
+    // We are not enforcing that all signatures are valid,
+    // but returning the number of valid signatures we have
+
+    if (signatures.length == 0) {
+        0
+    } else {
+        pubkey: PubKey = pubkeys.head;
+        signature: ByteArray = signatures.head;
+
+        signatures_counter: Int = verify_pubkey_signatures(
+            message,
+            pubkeys.tail,
+            signatures.tail
+        );
+
+        if (signature == #aa || !pubkey.verify(message, signature)) {
+            signatures_counter
+        } else {
+            1 + signatures_counter
+        }
+    }
+}
+
+func find_own_output(
+    validator_hash: ValidatorHash,
+    outputs: []TxOutput
+) -> TxOutput {
+    output: TxOutput = outputs.head;
+
+    output.address.credential.switch {
+        validator: Validator => {
+            if (validator.hash == validator_hash) {
+                output
+            } else {
+                find_own_output(validator_hash, outputs.tail)
+            }
+        },
+        else => {
+            find_own_output(validator_hash, outputs.tail)
+        }
+    }
+}
+
+func value_sent_to_address(tx: Tx, credential: Credential) -> Value {
+    credential.switch {
+        validator: Validator => {
+            tx.value_locked_by(validator.hash)
+        },
+        pubkey: PubKey => {
+            tx.value_sent_to(pubkey.hash)
+        }
+    }
+}
+
+func find_inputs_with_credential(
+    credential: Credential,
+    inputs: []TxInput
+) -> []TxInput {
+    if (inputs == []TxInput{}) {
+        inputs
+    } else {
+        input: TxInput = inputs.head;
+        tail_inputs: []TxInput = find_inputs_with_credential(credential, inputs.tail);
+
+        if (input.output.address.credential == credential) {
+            tail_inputs.prepend(input)
+        } else {
+            tail_inputs
+        }
+    }
+}
+
+func main(datum: Datum, redeemer: Redeemer, context: ScriptContext) -> Bool {
+    signatures: []ByteArray = redeemer.signatures;
+    results: ByteArray = redeemer.results;
+  
+    oracles: []PubKey = datum.oracles;
+    min_signatures: Int = datum.min_signatures;
+    own_hash: ValidatorHash = context.get_current_validator_hash();
+
+    script_inputs: []TxInput = find_inputs_with_credential(
+        Credential::new_validator(own_hash),
+        context.tx.inputs
+    );
+
+    counter: Int = verify_pubkey_signatures(results, oracles, signatures);
+
+    // If signatures is an empty list, we consider this the get money back case
+    // Meaning we enforce that it was signed by the creator and that the script
+    // dissapears
+    if (signatures.length == 0) {
+        creator: PubKeyHash = datum.creator;
+        script_outputs: []TxOutput = context.tx.outputs_locked_by(own_hash);
+
+        if (
+            context.tx.is_signed_by(creator)
+                && script_outputs.length == 0
+                && context.tx.time_range.start >= datum.deadline
+        ) {
+            true
+        } else {
+            false
+        }
+    } else if (counter < min_signatures) {
+        print("Does not have enough valid signatures!");
+
+        false
+    } else if (script_inputs.length != 1) {
+        // To prevent double satisfaction problem, make sure we only
+        // have one script as an input
+
+        print("Has more than one input");
+
+        false
+    } else {
+        outputs: []TxOutput = context.tx.outputs_locked_by_datum(
+            own_hash,
+            datum.add_results(results),
+            true
+        );
+
+        if (outputs.length == 1) {
+            script_input: TxInput = context.get_current_input();
+
+            value_received: Value = value_sent_to_address(context.tx, datum.payment_address);
+            value_expected: Value = script_input.output.value - Value::lovelace(3000000);
+
+            if (value_received >= value_expected) {
+                true
+            } else {
+                print("Not enough value for payment address");
+
+                false
+            }
+        } else {
+            print("Length of outputs is not 1");
+            false
+        }
+    }   
+}
