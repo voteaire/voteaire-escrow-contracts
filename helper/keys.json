@@ -1,0 +1,18 @@
+{
+  "alice": {
+    "skey": "7afe362e9a76195e5ee4b03bb7849027cdab978de24a38bc5e8273f21b54a6e2",
+    "vkey": "14889cdb4b72ad10d4d4243c4f50141eea1d10a3482cd20a7da6245d05ea01f1"
+  },
+  "bob": {
+    "skey": "ae2fe15e721c83791b17b2ed248628d61a05fcfad4f2979cc3f54f2e455f94c8",
+    "vkey": "f36f9a66f3916127e1ef303eef6cdde224c83da1fc46c3d948d2a68af62dced8"
+  },
+  "charlie": {
+    "skey": "c5a96488d860bd50d0c343c3b3a05b03a299bcb64c3a5e0f94052a07717f646d",
+    "vkey": "c3e991c8919b4e2ff03cf2a795afe98c14b3d3ebe2e380598e8b8b46ddac28c4"
+  },
+  "daniel": {
+    "skey": "5b62e179170f67341e93461f655284c5b793d1d2bfe763872760ab271f445f2d",
+    "vkey": "74ca8a3406d265acc80e03ee9caf4bef5ccd3686cc29cf24f4a3a1418765f3ac"
+  }
+}

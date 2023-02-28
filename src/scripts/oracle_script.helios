@@ -1,9 +1,11 @@
-spending escrow
+spending oracle
+
 
 struct Redeemer {
     results: ByteArray
     signatures: []ByteArray
 }
+
 
 struct Datum {
     proposal_id: String
@@ -161,10 +163,29 @@ func main(datum: Datum, redeemer: Redeemer, context: ScriptContext) -> Bool {
             script_input: TxInput = context.get_current_input();
 
             value_received: Value = value_sent_to_address(context.tx, datum.payment_address);
-            value_expected: Value = script_input.output.value - Value::lovelace(3000000);
+            
+            lovelace_input_value: Value = Value::lovelace(script_input.output.value.get(AssetClass::ADA));
+            value_expected: Value = lovelace_input_value - Value::lovelace(3000000);
+
+            script_value_expected: Value = script_input.output.value - lovelace_input_value;
 
             if (value_received >= value_expected) {
-                true
+                // Enforce that payment address receives at least script intput ADA - 3 ADA
+
+
+                // Enforce that our script mantains its value
+                script_output: TxOutput = outputs.head;
+
+                if (script_output.value >= script_value_expected) {
+                    // We are purposufully allowing garbage to be thrown into the script
+
+                    true
+                } else {
+                    print("Script output value is not equal to input value expected");
+
+                    false
+                }
+
             } else {
                 print("Not enough value for payment address");
 

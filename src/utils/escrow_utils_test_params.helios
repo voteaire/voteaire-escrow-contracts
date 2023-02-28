@@ -1,0 +1,44 @@
+spending escrow_utils_test_params
+
+
+import {
+    parse_results,
+    most_voted_choice,
+    Vote,
+    VoteUse,
+    IndexResult
+} from escrow_utils
+
+
+func main() -> Bool { true }
+
+const votes_list: [][]Vote = [][]Vote{
+    []Vote{
+        Vote{ count: 1, weigth: 2 },
+        Vote{ count: 3, weigth: 4 }
+    },
+    []Vote{
+        Vote{ count: 5, weigth: 6 },
+        Vote{ count: 7, weigth: 8 }
+    },
+    []Vote{
+        Vote{ count: 9, weigth: 10 },
+        Vote{ count: 11, weigth: 12 }
+    }
+}
+
+const test_parse_results: String = parse_results(votes_list)
+
+const max_votes_list: []Vote = []Vote{
+    Vote{ count: 1, weigth: 2 },
+    Vote{ count: 3, weigth: 4 },
+    Vote{ count: 5, weigth: 6 },
+    Vote{ count: 7, weigth: 16 },
+    Vote{ count: 9, weigth: 10 },
+    Vote{ count: 11, weigth: 12 }
+}
+
+const test_most_voted: IndexResult = most_voted_choice(max_votes_list, 0, VoteUse::Weigth)
+
+const test_most_voted_index: Int = test_most_voted.index
+const test_most_voted_result: Int = test_most_voted.result

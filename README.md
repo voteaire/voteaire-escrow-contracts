@@ -73,7 +73,7 @@ The script enforces the following behaviour:
 
 ## Testting
 
-We have a series of unit-tests for our script, which can be found inside `tests/test-params.helios`. It's execution is made in `tests/test-script.js` and in order to run the unit tests, you can move to the `tests` folder and run `node test-script.js`.
+We have a series of unit-tests for our script, which can be found inside `src/utils/*test*.helios` files. It's execution is made in the `tests` directory and in order to run the unit tests, you can move to the `tests` folder and run `node test_oracle.js` and `node test_escrow_utils.js`.
 
 ## Utils
 

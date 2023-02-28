@@ -1,0 +1,115 @@
+module escrow_utils
+
+
+import { Vote, VoteUse, IndexResult } from data_types
+
+
+func parse_choice_vote(vote: Vote) -> String {
+    vote.count.show() + ":" + vote.weigth.show()
+}
+
+
+func parse_choices(votes: []Vote) -> String {
+    // We will build a string based on the votes
+    // The string will be in the following format:
+    // "choice1:count1,choice2:count2,...,choiceN:countN"
+
+    if (votes.length == 0) {
+        // We have no votes
+
+        ""
+    } else {
+        first_vote: Vote = votes.head;
+        rest_of_votes: []Vote = votes.tail;
+
+        parsed_first: String = parse_choice_vote(first_vote);
+        parsed_tail: String = parse_choices(rest_of_votes);
+
+        if (parsed_tail == "") {
+            parsed_first
+        } else {
+            parsed_first + "," + parsed_tail
+        }
+    }
+}
+
+func parse_results(results: [][]Vote) -> String {
+    // We will build a string based on the results
+    // The string will be in the following format:
+    // "choice1:count1,choice2:count2,...,choiceN:countN"
+
+    if (results.length == 0) {
+        // We have no results
+
+        ""
+    } else {
+        first_result: []Vote = results.head;
+        rest_of_results: [][]Vote = results.tail;
+
+        parsed_first: String = parse_choices(first_result);
+        parsed_tail: String = parse_results(rest_of_results);
+
+        if (parsed_tail == "") {
+            parsed_first
+        } else {
+            parsed_first + "|" + parsed_tail
+        }
+    }
+}
+
+func most_voted_choice(
+    choices: []Vote,
+    start_index: Int,
+    vote_type: VoteUse
+) -> IndexResult {
+    // We will find the most voted choice
+
+    if (choices.length == 0) {
+        // We have no choices
+
+        error("No choices")
+    } else if (choices.length == 1) {
+        // We have only one choice
+
+        vote_type.switch {
+            Count => {
+                IndexResult{ index: start_index, result: choices.head.count}
+            },
+            Weigth => {
+                IndexResult{ index: start_index, result: choices.head.weigth}
+            }
+        }
+    } else {
+        first_choice: Vote = choices.head;
+        rest_of_choices: []Vote = choices.tail;
+
+        vote_type.switch {
+            Count => {
+                first_choice_count: Int = first_choice.count;
+                tail_most_voted: IndexResult = most_voted_choice(rest_of_choices, start_index+1, vote_type);
+
+                if (first_choice_count > tail_most_voted.result) {
+                    IndexResult{ index: start_index, result: first_choice_count }
+                } else {
+                    IndexResult{
+                        index: tail_most_voted.index,
+                        result: tail_most_voted.result
+                    }
+                }
+            },
+            Weigth => {
+                first_choice_weigth: Int = first_choice.weigth;
+                tail_most_voted: IndexResult = most_voted_choice(rest_of_choices, start_index+1, vote_type);
+
+                if (first_choice_weigth > tail_most_voted.result) {
+                    IndexResult{ index: start_index, result: first_choice_weigth }
+                } else {
+                    IndexResult{
+                        index: tail_most_voted.index,
+                        result: tail_most_voted.result
+                    }
+                }
+            }
+        }
+    }
+}

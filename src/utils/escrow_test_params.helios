@@ -1,0 +1,145 @@
+func mock_byte_string(base_byte: ByteArray, size: Int) -> ByteArray {
+    if (size == 0) {
+        #
+    } else if (size == 2) {
+		base_byte
+	} else {
+        base_byte + mock_byte_string(base_byte, size - 2)
+    }
+}
+
+func create_oracle_datum(results: Option[ByteArray]) -> OracleDatum {
+	OracleDatum {
+		proposal_id: "test",
+		minting_policy_identifier: MintingPolicyHash::new(mock_byte_string(#bb, 56)),
+		creator: PubKeyHash::new(mock_byte_string(#cc, 56)),
+		deadline: Time::new(1000),
+		oracles: []PubKey{},
+		min_signatures: 2,
+		payment_address: Credential::new_pubkey(
+			PubKeyHash::new(mock_byte_string(#aa, 56))
+		),
+		results: results
+	}
+}
+
+func create_script_context(
+	redeemer: Redeemer,
+	datum: Datum,
+	oracle_datum: OracleDatum,
+	outputs: []TxOutput,
+	signatures: []PubKeyHash
+) -> ScriptContext {
+	ScriptContext::new_spending(
+		Tx::new(
+			[]TxInput{TxInput::new(
+				TxOutputId::new(TxId::new(mock_byte_string(#aa, 64)), 0),
+				TxOutput::new(
+					Address::new(
+						Credential::new_validator(
+							ValidatorHash::new(mock_byte_string(#aa, 56))
+						),
+						Option[StakingCredential]::None
+					),
+					Value::lovelace(10000000),
+					OutputDatum::new_inline(datum)
+				)
+			)},
+			[]TxInput{TxInput::new(
+				TxOutputId::new(TxId::new(mock_byte_string(#dd, 64)), 0),
+				TxOutput::new(
+					Address::new(
+						Credential::new_validator(
+							ValidatorHash::new(mock_byte_string(#22, 56))
+						),
+						Option[StakingCredential]::None
+					),
+					Value::new(
+						AssetClass::new(
+							MintingPolicyHash::new(mock_byte_string(#00, 56)),
+							mock_byte_string(#00, 32)
+						),
+						1
+					),
+					OutputDatum::new_inline(oracle_datum)
+				)
+			)},
+			outputs,
+			Value::lovelace(160000),
+			Value::ZERO,
+			[]DCert{},
+			Map[StakingCredential]Int{},
+			TimeRange::from(Time::new(1000)),
+			signatures,
+			Map[ScriptPurpose]Redeemer{
+				ScriptPurpose::new_spending(
+					TxOutputId::new(TxId::new(mock_byte_string(#aa, 64)), 0)
+				): redeemer
+			},
+			Map[DatumHash]Data{}
+		),
+		TxOutputId::new(TxId::new(mock_byte_string(#aa, 64)), 0)
+	)
+}
+
+func mock_payment_output(base_byte: ByteArray, value: Value) -> TxOutput {
+	TxOutput::new(
+		Address::new(
+			Credential::new_pubkey(
+				PubKeyHash::new(mock_byte_string(base_byte, 56))
+			),
+			Option[StakingCredential]::None
+		),
+		value,
+		OutputDatum::new_none()
+	)
+}
+
+
+const base_case_oracle_datum: OracleDatum = create_oracle_datum(
+	Option[ByteArray]::Some{#313a322c333a342c353a362c303a30}
+)
+
+const base_case_datum: Datum = Datum {
+    oracle_minting_policy: MintingPolicyHash::new(mock_byte_string(#00, 56)),
+    creator: PubKeyHash::new(mock_byte_string(#cc, 56)),
+    deadline: Time::new(1000),
+    question_index: 0,
+    vote_use: VoteUse::Count, 
+    addresses: []Credential{
+		Credential::new_pubkey(
+			PubKeyHash::new(mock_byte_string(#aa, 56))
+		),
+		Credential::new_pubkey(
+			PubKeyHash::new(mock_byte_string(#bb, 56))
+		),
+		Credential::new_pubkey(
+			PubKeyHash::new(mock_byte_string(#cc, 56))
+		),
+		Credential::new_pubkey(
+			PubKeyHash::new(mock_byte_string(#dd, 56))
+		)
+	}
+}
+
+const base_case_redeemer: Redeemer = Redeemer::EscrowExecution {
+	oracleIndex: 0,
+    results: [][]Vote{
+		[]Vote{
+			Vote{ count: 1, weigth: 2 },
+			Vote{ count: 3, weigth: 4 },
+			Vote{ count: 5, weigth: 6 },
+			Vote{ count: 0, weigth: 0 }
+		}
+	}
+}
+
+const base_case_context: ScriptContext = create_script_context(
+	base_case_redeemer,
+	base_case_datum,
+	base_case_oracle_datum,
+	[]TxOutput{
+		mock_payment_output(#cc, Value::lovelace(9840000))
+	},
+	[]PubKeyHash{}
+)

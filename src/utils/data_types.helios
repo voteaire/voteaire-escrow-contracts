@@ -1,0 +1,73 @@
+module data_types
+
+
+// Technically this module is useless since the data types are defined in the
+// script file. However, it is useful to have them here in a single place too
+
+
+struct OracleRedeemer {
+    results: ByteArray
+    signatures: []ByteArray
+}
+
+
+struct OracleDatum {
+    proposal_id: String
+    minting_policy_identifier: MintingPolicyHash
+    creator: PubKeyHash
+    deadline: Time
+    oracles: []PubKey
+    min_signatures: Int
+    payment_address: Credential
+    results: Option[ByteArray]
+
+    func add_results(self, results: ByteArray) -> OracleDatum {
+        OracleDatum {
+            proposal_id: self.proposal_id,
+            minting_policy_identifier: self.minting_policy_identifier,
+            creator: self.creator,
+            deadline: self.deadline,
+            oracles: self.oracles,
+            min_signatures: self.min_signatures,
+            payment_address: self.payment_address,
+            results: Option[ByteArray]::Some{results}
+        }
+    }
+}
+
+
+struct Vote {
+    count: Int
+    weigth: Int
+}
+
+
+enum VoteUse {
+    Count
+    Weigth
+}
+
+
+struct IndexResult {
+    index: Int
+    result: Int
+}
+
+
+enum EscrowRedeemer {
+    CreatorRetrieval
+    EscrowExecution {
+        oracleIndex: Int
+        results: [][]Vote
+    }
+}
+
+
+struct EscrowDatum {
+    oracle_minting_policy: MintingPolicyHash
+    creator: PubKeyHash
+    deadline: Time
+    question_index: Int
+    vote_use: VoteUse
+    addresses: []Credential
+}

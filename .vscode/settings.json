@@ -1,0 +1,7 @@
+{
+    "python.formatting.provider": "black",
+    "files.associations": {
+        "*.helios": "rust",
+        
+      }
+}

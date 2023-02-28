@@ -1,0 +1,154 @@
+spending escrow
+
+
+import {
+    parse_results,
+    most_voted_choice
+} from escrow_utils
+
+import { OracleDatum, Vote, VoteUse, IndexResult } from data_types
+
+// It is cheaper to build a string based on a list of integer
+// than to convert a list of integers to a string
+
+// Therefore we will do all the work of parsing the result
+// off-chain and the contract will convert the parsed result
+// back into an unparsed result and make sure it is the same
+// as the one we got from the oracle
+
+enum Redeemer {
+    // Creator wants to retrieve his tokens
+    CreatorRetrieval
+
+    // We want to execute the escrow actions
+    EscrowExecution {
+        // The reference input index from the oracle results
+        oracleIndex: Int
+        results: [][]Vote
+    }
+}
+
+
+struct Datum {
+    // So we can enforce that we are getting things from
+    // the right input
+    oracle_minting_policy: MintingPolicyHash
+
+    creator: PubKeyHash
+    deadline: Time
+
+    // What question from the results are we interested in?
+    question_index: Int
+    vote_use: VoteUse
+
+    // The index of the choice with more votes should be
+    // same as index of address to which it should go
+    addresses: []Credential
+}
+
+
+func contains_address(output: TxOutput, address: Credential) -> Bool {
+    output.address.credential == address
+}
+
+
+func main(datum: Datum, redeemer: Redeemer, context: ScriptContext) -> Bool {
+    // There are two possibilities:
+    // * Creator wants to retrieve his tokens
+    // * We want to execute the escrow actions
+
+    redeemer.switch {
+        CreatorRetrieval => {
+            // We are in the first scenario
+            // We need to check that:
+            // * The deadline has passed
+            // * The creator is the one who is trying to retrieve the tokens
+
+            // We check that the deadline has passed
+            context.tx.time_range.start >= datum.deadline &&
+
+            // We check that the creator is the one who is trying to retrieve the tokens
+            context.tx.is_signed_by(datum.creator)
+        },
+        e: EscrowExecution => {
+            // We are in the second scenario
+            // We need to check that:
+            // * The oracle minting policy is correct
+            // * The oracle results match the results from the redeemer
+            // * The tokens from our script are going to the
+            // address with the index of the choice which was the most voted
+
+            // First let's get the reference input from the oracle
+            oracle_input: TxOutput = context.tx.ref_inputs.get(e.oracleIndex).output;
+
+            // We check that the oracle minting policy is correct
+            oracle_contains_policy: Bool = oracle_input.value.contains_policy(
+                datum.oracle_minting_policy
+            );
+
+            // Parse results from redeemer into string
+            redeemer_results: String = parse_results(e.results);
+
+            oracle_output_datum: OutputDatum = oracle_input.datum;
+            // oracle_data: Data = oracle_input.datum.get_inline_data();
+
+            oracle_data: Data = oracle_output_datum.switch{
+                inline: Inline => inline.data,
+                else => error("not an inline datum")
+            };
+
+            oracle_datum: OracleDatum = OracleDatum::from_data(oracle_data);
+
+            oracle_results: ByteArray = oracle_datum.results.unwrap();
+
+            // Make sure results from the redeemer match the
+            // results from the oracle datum
+            redeemer_results_match_datum: Bool = oracle_results == redeemer_results.encode_utf8();
+
+            // Get the choice index with most votes
+            most_voted_index: Int = most_voted_choice(
+                e.results.get(datum.question_index),
+                0,
+                datum.vote_use
+            ).index;
+
+            // Get the address with the index of the most voted choice
+            address: Credential = datum.addresses.get(most_voted_index);
+
+            // Make sure the tokens from our script are going to the
+            // address with the index of the choice which was the most voted
+            address_output: TxOutput = context.tx.outputs.find(
+                (out: TxOutput) -> Bool { contains_address(out, address) }
+            );
+
+            // Assuming fees of 2 ADA
+            script_input: TxInput = context.get_current_input();
+            value_expected: Value = script_input.output.value - context.tx.fee;
+
+            output_contains_script_tokens: Bool = address_output.value >= value_expected;
+
+            if (!oracle_contains_policy) {
+                print("Oracle minting policy is incorrect");
+
+                false
+            } else if (!redeemer_results_match_datum) {
+                print("Results from the redeemer do not match the results from the oracle");
+
+                false
+            } else if (!output_contains_script_tokens) {
+                print("The tokens from our script are not going to the address with the index of the choice which was the most voted");
+
+                false
+            } else if (context.tx.fee > Value::lovelace(2000000)) {
+                // Avoid attack where someone creates a transaction
+                // with a very high fee to drain the escrow
+                print("Fee is too high");
+
+                false
+            } else {
+                true
+            }
+        },
+        else => false
+    }
+}

@@ -4,11 +4,17 @@
   "description": "",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest tests/"
   },
   "author": "et",
   "license": "MIT",
   "dependencies": {
-    "@hyperionbt/helios": "^0.10.5"
+    "@hyperionbt/helios": "^0.10.15"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.12",
+    "@babel/preset-env": "^7.20.2",
+    "jest": "^29.4.2",
+    "jest-babel": "^1.0.1"
   }
 }

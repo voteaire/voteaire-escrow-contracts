@@ -1,12 +1,18 @@
-import * as helios from "../helios.js"
-import assert from "assert";
+import * as helios from "../src/helios.js";
 import fs from "fs";
 
-const validator = fs.readFileSync("../oracle_script.helios").toString();
-const testParams = fs.readFileSync("./test-params.helios").toString();
+const validator = fs
+  .readFileSync("../src/scripts/oracle_script.helios")
+  .toString();
+
+const data_types = fs.readFileSync("../src/utils/data_types.helios").toString();
+
+const testParams = fs
+  .readFileSync("../src/utils/oracle_test_params.helios")
+  .toString();
 
 // Concat validator src and test params src
-const program = helios.Program.new(validator + testParams);
+const program = helios.Program.new(validator + testParams, [data_types]);
 
 async function testSuccess(testName, paramNames) {
   console.log(`Test: ${testName}`);
@@ -34,7 +40,7 @@ async function testSuccess(testName, paramNames) {
       }
     })
     .catch((err) => {
-      console.log("Error happened!")
+      console.log("Error happened!");
       console.log(
         "ARGS: ",
         args.map((v) => v.toString())
@@ -58,7 +64,7 @@ async function testFailure(testName, paramNames) {
       if (assertion) {
         console.log(`Test ${testName} was successful!`);
       } else {
-        console.log(res[0].toString())
+        console.log(res[0].toString());
 
         console.log(
           "ARGS: ",
@@ -70,7 +76,7 @@ async function testFailure(testName, paramNames) {
       }
     })
     .catch((err) => {
-      console.log("Error happened!")
+      console.log("Error happened!");
       console.log(
         "ARGS: ",
         args.map((v) => v.toString())
